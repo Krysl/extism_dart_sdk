@@ -1,0 +1,2 @@
+gen:
+  dart run ffigen .
