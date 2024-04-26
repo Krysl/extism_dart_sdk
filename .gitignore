@@ -8,3 +8,13 @@ pubspec.lock
 
 # extism binary lib & header
 assets/lib/
+
+# teest file downloaded from https://raw.githubusercontent.com/extism/extism/main/manifest/schema.json
+test/extism/api/schema.json
+test/**/*.log
+
+# use when dev
+test/wasm/*.c
+test/wasm/*.h
+coverage/coverage.json
+coverage/lcov.info

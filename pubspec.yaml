@@ -9,13 +9,26 @@ environment:
 # Add regular dependencies here.
 dependencies:
   ffi: ^2.1.2
+  freezed_annotation: ^2.4.1
+  json_annotation: ^4.8.1
+  logger: ^2.2.0
+  option_result: ^3.2.0
   path: ^1.9.0
   uuid: ^4.4.0
 
 dev_dependencies:
+  build_runner: ^2.4.9
   ffigen: ^11.0.0
+  freezed: ^2.5.1
+  http: ^1.2.1
+  json_schema: ^5.1.7
+  json_serializable: ^6.7.1
   lints: ^3.0.0
+  meta: ^1.14.0
+  stack_trace: ^1.11.1
   test: ^1.24.0
+  toml: ^0.15.0
+  vm_service: ^14.2.1
 
 ffigen:
   output: 'lib/extism/generated_bindings.dart'
@@ -25,3 +38,14 @@ ffigen:
     entry-points:
       - 'assets/lib/windows/extism.h'
   name: 'LibExtism'
+  preamble: '// ignore_for_file: unused_element, unused_field'
+  enums:
+    rename:
+      "ExtismValType": "_ExtismValType"
+  macros:
+    rename:
+      "_+(.*)": "$1"
+  functions:
+    symbol-address:
+      include:
+        - 'extism_function_free'
