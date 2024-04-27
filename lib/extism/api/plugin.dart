@@ -66,7 +66,11 @@ class Plugin {
     print('plugin freed');
   }
 
-  Plugin(Uint8List wasm, bool withWasi, this.functions) {
+  Plugin(
+    Uint8List wasm, {
+    bool withWasi = false,
+    this.functions = const [],
+  }) {
     final errmsg = ErrorMsg();
     _plugin = ExtismApi.api.pluginNew(
       wasm,
@@ -91,8 +95,8 @@ class Plugin {
   }) =>
       Plugin(
         File(wasmFilePath).readAsBytesSync(),
-        withWasi,
-        functions,
+        withWasi: withWasi,
+        functions: functions,
       );
 
 // FIXME:
@@ -104,8 +108,8 @@ class Plugin {
     logger.d(manifest.toJsonString(indent: '  '));
     return Plugin(
       manifest.toJsonInUInt8List(),
-      withWasi,
-      functions,
+      withWasi: withWasi,
+      functions: functions,
     );
   }
 
@@ -127,12 +131,14 @@ class Plugin {
       }
     }
     final length = api.pluginOutputLength(_plugin);
-    if (length <= 0) {
-      return Err(ExtismCallError('call $functionName failed'));
+    if (length < 0) {
+      return Err(ExtismCallError(
+          'call $functionName failed, output length = $length'));
     }
     final ptr = api.pluginOutputData(_plugin);
     if (ptr == ffi.nullptr) {
-      return Err(ExtismCallError('call $functionName failed'));
+      return Err(ExtismCallError(
+          'call $functionName failed, output data\'pointer = nullptr'));
     }
     return Ok((ptr.cast(), length, -1));
   }
@@ -146,11 +152,13 @@ class Plugin {
   Result<Buffer, Error> callWithString(String functionName, String input) {
     final userData = UserData.fromString(input);
 
-    return call(
+    var result = call(
       functionName,
-      userData.data.cast(),
+      userData.uint8Ptr,
       userData.length,
     );
+    userData.free();
+    return result;
   }
 
 // Call a plugin function with native string buffer

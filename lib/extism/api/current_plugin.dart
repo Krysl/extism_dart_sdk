@@ -10,59 +10,46 @@ import 'buffer.dart';
 import 'types.dart';
 
 typedef ExtismCurrentPluginPtr = ffi.Pointer<ExtismCurrentPlugin>;
+typedef CurrentPluginPtr = ffi.Pointer<CurrentPlugin>;
 
-class CurrentPlugin extends CurrentPluginBase
-    with CurrentPluginInputMixin, CurrentPluginOutputMixin {
-  CurrentPlugin({
-    required super.pointer,
-    required super.inputs,
-    required super.inputsNum,
-    required super.outputs,
-    required super.outputsNum,
-  });
-}
+/// - memory: alloc/free
+/// - buffer: alloc/free
+/// - set inport/output in various types
+base class CurrentPlugin extends ffi.Struct {
+  external ExtismCurrentPluginPtr plugin;
+  external ffi.Pointer<ExtismVal> inputs;
+  @ffi.Int32()
+  external DartExtismSize inputsNum;
+  external ffi.Pointer<ExtismVal> outputs;
+  @ffi.Int32()
+  external DartExtismSize outputsNum;
 
-abstract class CurrentPluginBase {
-  ExtismCurrentPluginPtr pointer;
-  ffi.Pointer<ExtismVal> inputs;
-  DartExtismSize inputsNum;
-  ffi.Pointer<ExtismVal> outputs;
-  DartExtismSize outputsNum;
-  CurrentPluginBase({
-    required this.pointer,
-    required this.inputs,
-    required this.inputsNum,
-    required this.outputs,
-    required this.outputsNum,
-  });
   ExtismApi get api => ExtismApi.api;
 
-  // Memory operations
+  //#region Memory operations
   MemoryHandle memory({MemoryOffset offset = 0}) =>
-      api.currentPluginMemory(pointer) + offset;
+      api.currentPluginMemory(plugin) + offset;
 
   MemoryOffset memoryAlloc(int size) =>
-      api.currentPluginMemoryAlloc(pointer, size);
+      api.currentPluginMemoryAlloc(plugin, size);
 
   void memoryFree(MemoryHandle handle) =>
-      api.currentPluginMemoryFree(pointer, handle.address);
+      api.currentPluginMemoryFree(plugin, handle.address);
 
-  MemoryHandle memoryLength({int offset = 0}) =>
-      api.currentPluginMemoryLength(pointer, offset).cast();
+  int memoryLength({int offset = 0}) =>
+      api.currentPluginMemoryLength(plugin, offset);
 
   Buffer bufferAlloc(int size) {
     final ofst = memoryAlloc(size);
     return (memory(offset: ofst), size, ofst);
   }
 
-  Buffer bufferCopy(CurrentPluginBase cp, Buffer buf) {
+  Buffer bufferCopy(CurrentPlugin cp, Buffer buf) {
     final newBuf = bufferAlloc(buf.size);
     newBuf.writeBuffer(buf);
     return newBuf;
   }
-}
 
-mixin CurrentPluginInputMixin on CurrentPluginBase {
   Buffer inputBuffer(int index) {
     if (index >= inputsNum) {
       return (ffi.nullptr, -1, -1);
@@ -72,7 +59,7 @@ mixin CurrentPluginInputMixin on CurrentPluginBase {
       return (ffi.nullptr, -1, -1);
     }
     final ofst = inp.v.i64;
-    final length = memoryLength(offset: ofst).address;
+    final length = memoryLength(offset: ofst);
 
     return (memory(offset: ofst), length, ofst);
   }
@@ -93,9 +80,9 @@ mixin CurrentPluginInputMixin on CurrentPluginBase {
     }
     return inputs[index];
   }
-}
+  //#endregion
 
-mixin CurrentPluginOutputMixin on CurrentPluginBase {
+  //#region buffer
   bool outputBuffer(Buffer srcbuf, int index) =>
       setOutputBuffer(index, bufferCopy(this, srcbuf));
 
@@ -127,4 +114,5 @@ mixin CurrentPluginOutputMixin on CurrentPluginBase {
     outputs[index].v.i64 = buf.ofst;
     return true;
   }
+  //#endregion
 }

@@ -40,3 +40,4 @@ extension To on List<ExtismValType> {
 List<ExtismValType> l = [];
 
 typedef VoidPointer = ffi.Pointer<ffi.Void>;
+typedef Uint8Pointer = ffi.Pointer<ffi.Uint8>;

@@ -5,13 +5,36 @@ import 'package:ffi/ffi.dart';
 import '../../extism_dart_sdk.dart';
 import '../generated_bindings.dart';
 
-final class HostFunction extends ffi.Struct {
+typedef FreeFunction = ffi.Void Function(ffi.Pointer<ffi.Void>);
+
+extension ToNativeCallable on void Function(VoidPointer _) {
+  ffi.NativeCallable<ffi.Void Function(VoidPointer _)> get nativeCallable =>
+      ffi.NativeCallable.isolateLocal(this);
+  ffi.Pointer<ffi.NativeFunction<ffi.Void Function(VoidPointer _)>>
+      get nativeFunction => nativeCallable.nativeFunction;
+}
+
+extension ToNativeCallable2 on DartExtismFunctionTypeFunction {
+  ffi.NativeCallable<ExtismFunctionTypeFunction> get nativeCallable =>
+      ffi.NativeCallable<ExtismFunctionTypeFunction>.isolateLocal(this);
+
+  ffi.Pointer<ffi.NativeFunction<ExtismFunctionTypeFunction>>
+      get nativeFunction => nativeCallable.nativeFunction;
+}
+
+/// *Advanced(not raw) Host Function* box
+final class HostFunctionBox extends ffi.Struct {
   external ffi.Pointer<ffi.NativeFunction<UserDataFunction>> func;
 
   external VoidPointer userData;
 
-  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Pointer)>>
-      freeUserData;
+  external ffi.Pointer<ffi.NativeFunction<FreeFunction>> freeUserData;
+
+  DartUserDataFunction get asDartFunction => func.asFunction();
+
+  void run(CurrentPluginPtr plugin) {
+    asDartFunction(plugin, userData);
+  }
 }
 
 class HostFunctionFactory implements ffi.Finalizable {
@@ -19,10 +42,10 @@ class HostFunctionFactory implements ffi.Finalizable {
       ExtismApi.api.lib.addresses.extism_function_free.cast());
 
   ExtismFunctionPtr _func;
-  String _name;
-  late ffi.Pointer<HostFunction> _userData;
-  HostFunctionFactory._(this._name, this._func, this._userData);
 
+  HostFunctionFactory._(this._func);
+
+  /// *Advanced Host Function* creater
   factory HostFunctionFactory.newFunc(
       String name,
       List<ExtismValType> inputs,
@@ -31,79 +54,52 @@ class HostFunctionFactory implements ffi.Finalizable {
       VoidPointer userData,
       void Function(VoidPointer _) freeUserData,
       {String? namespace}) {
-    final inputsNum = inputs.length;
-    final outputsNum = outputs.length;
-
-    final ins = calloc.call<ffi.Int32>(inputsNum)
-      ..asTypedList(inputsNum).setAll(0, inputs.toIterableInt());
-    final outs = calloc.call<ffi.Int32>(outputsNum)
-      ..asTypedList(outputsNum).setAll(0, outputs.toIterableInt());
-
-    void freeData(VoidPointer _) {
-      logger.d('freeData');
-      // calloc.free(ins);
-      // calloc.free(outs);
-    }
-
-    final userDataPtr = calloc.call<HostFunction>(1);
+    final userDataPtr = calloc.call<HostFunctionBox>(1);
     userDataPtr.ref
       ..func =
           ffi.NativeCallable<UserDataFunction>.isolateLocal(func).nativeFunction
       ..userData = userData
-      ..freeUserData =
-          ffi.NativeCallable<ffi.Void Function(ffi.Pointer)>.isolateLocal(
-                  freeUserData)
-              .nativeFunction;
+      ..freeUserData = freeUserData.nativeFunction;
 
-    void functionCallback(
+    void hostFunctionWrapper(
       ExtismCurrentPluginPtr plugin,
       ffi.Pointer<ExtismVal> inputs,
       DartExtismSize inputsNum,
       ffi.Pointer<ExtismVal> outputs,
       DartExtismSize outputsNum,
-      VoidPointer data,
+      VoidPointer box,
     ) {
-      final d = data.cast<HostFunction>();
-      final fn = d.ref.func.asFunction<DartUserDataFunction>();
-      final cp = CurrentPlugin(
-        pointer: plugin,
-        inputs: inputs,
-        inputsNum: inputsNum,
-        outputs: outputs,
-        outputsNum: outputsNum,
-      );
-
-      fn(plugin, d.ref.userData);
-
-      final strPtr = cp.inputUtf8String(0);
-      // print('get currentPluginMemory: $strPtr');
-      cp.outputString(strPtr, 0);
+      final cpPtr = calloc.call<CurrentPlugin>();
+      cpPtr.ref
+        ..plugin = plugin
+        ..inputs = inputs
+        ..inputsNum = inputsNum
+        ..outputs = outputs
+        ..outputsNum = outputsNum;
+      box.cast<HostFunctionBox>().ref.run(cpPtr);
+      calloc.free(cpPtr);
     }
 
-    final ptr = ExtismApi.api.lib.extism_function_new(
-      name.toNativeUtf8().cast(),
-      ins,
-      inputsNum,
-      outs,
-      outputsNum,
-      ffi.NativeCallable<ExtismFunctionTypeFunction>.isolateLocal(
-              functionCallback)
-          .nativeFunction,
+    void freeData(VoidPointer _) {
+      logger.d('freeData'); // todo: using this to free?
+    }
+
+    final rawHostFunctionPtr = ExtismApi.api.lib.extism_function_new(
+      name.n.charPtr,
+      inputs.n.dataPtr,
+      inputs.length,
+      outputs.n.dataPtr,
+      outputs.length,
+      hostFunctionWrapper.nativeFunction,
       userDataPtr.cast(),
-      ffi.NativeCallable<ffi.Void Function(VoidPointer _)>.isolateLocal(
-              freeData)
-          .nativeFunction,
+      freeData.nativeFunction,
     );
 
     // finalizer
-    final wrapper = HostFunctionFactory._(
-      name,
-      ptr,
-      userDataPtr,
-    );
-    _finalizer.attach(wrapper, ptr.cast(), detach: wrapper);
+    final wrapper = HostFunctionFactory._(rawHostFunctionPtr);
+    _finalizer.attach(wrapper, rawHostFunctionPtr.cast(), detach: wrapper);
     if (namespace != null) {
-      ExtismApi.api.setNamespace(ptr, namespace);
+      ExtismApi.api.setNamespace(rawHostFunctionPtr, namespace);
     }
     return wrapper;
   }

@@ -6,7 +6,7 @@ import 'package:ffi/ffi.dart';
 import 'package:option_result/option_result.dart';
 
 typedef MemoryHandle = ffi.Pointer<ffi.Uint8>;
-typedef Buffer = (MemoryHandle, int, int ofst);
+typedef Buffer = (MemoryHandle, int size, int ofst);
 
 extension BufferAsTypedList on Buffer {
   MemoryHandle get ptr => $1;
@@ -34,5 +34,13 @@ extension BufferToJsonMap on Buffer {
 }
 
 extension ResultToJsonMap on Result<Buffer, Error> {
-  Map<String, dynamic> toJsonMap() => unwrap().toJsonMap();
+  Map<String, dynamic> toJsonMap() => inspectErr((e) => throw e)
+      .inspect((buf) {
+        if (buf.size <= 0) {
+          throw UnsupportedError(
+              'Buffer size ${buf.size}, can not convern to json');
+        }
+      })
+      .unwrap()
+      .toJsonMap();
 }

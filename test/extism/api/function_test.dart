@@ -4,6 +4,8 @@ import 'package:extism_dart_sdk/extism_dart_sdk.dart';
 import 'package:ffi/ffi.dart';
 import 'package:test/test.dart';
 
+import '../../wasms.dart';
+
 void main() {
   late final ExtismApi extism;
 
@@ -15,7 +17,7 @@ void main() {
     test('test Function', () {
       // extism.logCustom("extism=trace,cranelift=trace");
       extism.logCustom('debug');
-      final wasmFilePath = 'test/wasm/code-functions.wasm';
+      final wasmFilePath = WasmFiles.wasm;
 
       final fn = HostFunctionFactory.newFunc(
         'hello_world',
@@ -24,6 +26,10 @@ void main() {
         (currentPlugin, userdata) {
           print('Hello from Dart Callback!');
           print('get userData: ${userdata.cast<Utf8>().toDartString()}');
+          final cp = currentPlugin.ref;
+          final strPtr = cp.inputUtf8String(0);
+          print('currentPlugin get input: $strPtr');
+          cp.outputString(strPtr, 0);
         },
         'Dart userData => plugin:Hello, again!'.toNativeUtf8().cast(),
         (_) {
@@ -40,9 +46,11 @@ void main() {
       final testData = 'test data';
       final ret = plugin.call(
         'count_vowels',
-        testData.toNativeUtf8().cast(),
+        testData.n.dataPtr,
         testData.length,
-      );
+      )..inspectErr((e) {
+          throw e;
+        });
       print('count_vowels ret = ${ret.unwrap().toDartString()}');
 
       plugin.free(); //todo auto free

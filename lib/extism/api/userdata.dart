@@ -8,15 +8,14 @@ import 'current_plugin.dart';
 import 'types.dart';
 
 typedef DartUserDataFunction = void Function(
-  // FIXME: can not use currentPlugin in dart.
-  ExtismCurrentPluginPtr currentPlugin,
+  CurrentPluginPtr currentPlugin,
   VoidPointer userdata,
 );
 
 // FIXME: The type is too rigid.
 // should support most types
 typedef UserDataFunction = ffi.Void Function(
-  ExtismCurrentPluginPtr,
+  CurrentPluginPtr,
   VoidPointer,
 );
 typedef DartFinalizerFunction = ffi.Void Function(VoidPointer token);
@@ -25,11 +24,12 @@ typedef DartFinalizerFunction = ffi.Void Function(VoidPointer token);
 // const _calloc = calloc;
 
 class UserData<T extends ffi.NativeType> implements ffi.Finalizable {
-  ffi.Pointer<T> _data;
+  ffi.Pointer<T> dataPtr;
   int length;
-  VoidPointer get data => _data.cast();
+  VoidPointer get voidPtr => dataPtr.cast();
+  Uint8Pointer get uint8Ptr => dataPtr.cast();
 
-  UserData._(this._data, this.length);
+  UserData._(this.dataPtr, this.length);
 
   static final UserData fake = UserData.fromString('Fake userData');
 
@@ -64,8 +64,29 @@ class UserData<T extends ffi.NativeType> implements ffi.Finalizable {
   }
 
   static final _finalizer = ffi.NativeFinalizer(calloc.nativeFree);
+  bool _freed = false;
+  void free() {
+    if (_freed) {
+      return;
+    }
+    _freed = true;
+    _finalizer.detach(this);
+  }
 }
 
-extension UserDataUint8AsTypedList on UserData<ffi.Uint8> {
-  Uint8List asTypedList() => _data.asTypedList(length);
+extension UserDataUint8To on UserData<ffi.Uint8> {
+  Uint8List asTypedList() => dataPtr.asTypedList(length);
+  ffi.Pointer<ffi.Char> get charPtr => dataPtr.cast();
+}
+
+extension StringToUserData on String {
+  UserData<ffi.Uint8> get n => UserData.fromString(this);
+}
+
+extension ListExtismValTypeToUserData on List<ExtismValType> {
+  UserData<ffi.Int32> get n {
+    final ret = UserData<ffi.Int32>.allocate(length);
+    ret.dataPtr.asTypedList(length).setAll(0, toIterableInt());
+    return ret;
+  }
 }

@@ -87,11 +87,6 @@ Wasm _$WasmFromJson(Map<String, dynamic> json) => Wasm(
       WasmSource.fromJson(json['src'] as Map<String, dynamic>),
     );
 
-Map<String, dynamic> _$WasmToJson(Wasm instance) => <String, dynamic>{
-      'src': instance.src,
-      'hash': instance._hash,
-    };
-
 Manifest _$ManifestFromJson(Map<String, dynamic> json) => Manifest(
       wasmList: (json['wasm'] as List<dynamic>?)
               ?.map((e) => Wasm.fromJson(e as Map<String, dynamic>))

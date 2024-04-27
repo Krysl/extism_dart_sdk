@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -9,7 +10,7 @@ import 'package:test/test.dart';
 import 'package:toml/toml.dart';
 
 // ignore: library_prefixes
-import '../../wasms.dart' as wasmFiles;
+import '../../wasms.dart';
 import '../utils/log.dart';
 
 part 'runtime_test.freezed.dart';
@@ -24,6 +25,22 @@ class Count with _$Count {
 }
 
 // Code ported from:  https://github.com/extism/extism/blob/main/runtime/src/tests/runtime.rs
+
+void helloWorld(
+  CurrentPluginPtr currentPlugin,
+  VoidPointer userdata,
+) {
+  final cp = currentPlugin.ref;
+  final buf = cp.inputBuffer(0);
+  cp.outputBuffer(buf, 0);
+}
+
+void helloWorldPanic(
+  CurrentPluginPtr currentPlugin,
+  VoidPointer userdata,
+) {
+  throw StateError('This should not run');
+}
 
 void main() {
   late final ExtismApi extism;
@@ -50,8 +67,8 @@ void main() {
         'hello_world',
         [ExtismValType.PTR],
         [ExtismValType.PTR],
-        (currentPlugin, userdata) {},
-        UserData.fake.data,
+        helloWorld,
+        UserData.fake.voidPtr,
         (_) {},
         namespace: 'extism:host/user',
       );
@@ -59,16 +76,14 @@ void main() {
         'hello_world',
         [ExtismValType.PTR],
         [ExtismValType.PTR],
-        (currentPlugin, userdata) {
-          throw StateError('This should not run');
-        },
-        UserData.fake.data,
+        helloWorldPanic,
+        UserData.fake.voidPtr,
         (_) {},
         namespace: 'test',
       );
 
       plugin = Plugin.fromManifest(
-        Manifest.path(wasmFiles.wasm),
+        Manifest.path(WasmFiles.wasm),
         functions: [f.func, g.func], // todo:
         withWasi: true,
       );
@@ -170,19 +185,10 @@ void main() {
 
       void entryPoint((SendPort, int) args) {
         final (sendPort, i) = args;
-        final f = HostFunctionFactory.newFunc(
-          'hello_world',
-          [ExtismValType.PTR],
-          [ExtismValType.PTR],
-          (currentPlugin, userdata) {},
-          UserData.fake.data,
-          (_) {},
-          namespace: 'extism:host/user',
-        );
+
         print('#$i');
         final plugin = Plugin.fromManifest(
-          Manifest.path(wasmFiles.wasm),
-          functions: [f.func],
+          Manifest.path(WasmFiles.wasmNoFunctions),
           withWasi: true,
         );
         final result = plugin
@@ -231,13 +237,13 @@ void main() {
         'hello_world',
         [ExtismValType.PTR],
         [ExtismValType.PTR],
-        (currentPlugin, userdata) {},
-        UserData.fake.data,
+        helloWorld,
+        UserData.fake.voidPtr,
         (_) {},
         namespace: 'extism:host/user',
       );
       final plugin = Plugin.fromManifest(
-        Manifest.path(wasmFiles.wasmLoop),
+        Manifest.path(WasmFiles.wasmLoop),
         functions: [f.func],
         withWasi: true,
       );
@@ -271,7 +277,7 @@ void main() {
           onError: port.sendPort,
         ));
 
-        ///  FIXME:
+        ///  FIXME: ffi block function will block all!!!
         /// [Allow Ffi calls to be marked as potentially blocking / exiting the isolate.](@dart-lang/sdk#51261)
         /// ? can i make it as a plugin, so we can wrap the call
         throw Exception('''
@@ -287,22 +293,11 @@ void main() {
     });
 
     test('test timeout', () {
-      final f = HostFunctionFactory.newFunc(
-        'hello_world',
-        [ExtismValType.PTR],
-        [ExtismValType.PTR],
-        (currentPlugin, userdata) {},
-        UserData.fake.data,
-        (_) {},
-        namespace: 'extism:host/user',
-      );
-
       final plugin = Plugin.fromManifest(
-        Manifest.path(wasmFiles.wasmLoop)
+        Manifest.path(WasmFiles.wasmLoop)
           ..withTimeout(
             Duration(seconds: 1),
           ),
-        functions: [f.func],
         withWasi: true,
       );
       final startTime = Stopwatch()..start();
@@ -315,7 +310,7 @@ void main() {
 
     test('test multiple instantiations', () {
       final plugin = Plugin.fromManifest(
-        Manifest.path(wasmFiles.wasmNoFunctions),
+        Manifest.path(WasmFiles.wasmNoFunctions),
         withWasi: true,
       );
       final num = 10001;
@@ -341,7 +336,7 @@ void main() {
     test('test globals', () {
       final startTime = Stopwatch()..start();
       final plugin = Plugin.fromManifest(
-        Manifest.path(wasmFiles.wasmGlobals),
+        Manifest.path(WasmFiles.wasmGlobals),
       );
       final num = 100000;
       List.generate(num, (index) {
@@ -361,7 +356,7 @@ void main() {
     });
 
     test('test toml manifest', () {
-      final manifest = Manifest.path(wasmFiles.wasmNoFunctions)
+      final manifest = Manifest.path(WasmFiles.wasmNoFunctions)
         ..withTimeout(Duration(seconds: 1));
       final manifestString = manifest.toJsonString();
       print(manifestString);
@@ -370,8 +365,7 @@ void main() {
       ) as Map);
       final plugin = Plugin(
         manifestToml.toString().toUint8List(),
-        true,
-        [],
+        withWasi: true,
       );
       final {'count': count} = plugin
           .callWithString(
@@ -390,13 +384,13 @@ void main() {
         'host_reflect',
         [ExtismValType.PTR],
         [ExtismValType.PTR],
-        (currentPlugin, userdata) {},
-        UserData.fake.data,
+        helloWorld,
+        UserData.fake.voidPtr,
         (_) {},
         namespace: 'extism:host/user',
       );
       final plugin = Plugin.fromManifest(
-        Manifest.path(wasmFiles.wasmReflect),
+        Manifest.path(WasmFiles.wasmReflect),
         functions: [f.func],
       );
       final totalStartTime = Stopwatch()..start();
@@ -434,7 +428,7 @@ void main() {
     test('test memory max', () {
       {
         final plugin = Plugin.fromManifest(
-          Manifest.path(wasmFiles.wasmNoFunctions)
+          Manifest.path(WasmFiles.wasmNoFunctions)
             ..memoryMax = 16
             ..withTimeout(Duration(seconds: 5)),
           withWasi: true,
@@ -457,7 +451,7 @@ void main() {
       }
       {
         final plugin = Plugin.fromManifest(
-          Manifest.path(wasmFiles.wasmNoFunctions)..memoryMax = 17,
+          Manifest.path(WasmFiles.wasmNoFunctions)..memoryMax = 17,
           withWasi: true,
         );
         final output = plugin.callWithString(
@@ -470,7 +464,7 @@ void main() {
       }
       {
         final plugin = Plugin.fromManifest(
-          Manifest.path(wasmFiles.wasmNoFunctions),
+          Manifest.path(WasmFiles.wasmNoFunctions),
           withWasi: true,
         );
         final output = plugin.callWithString(

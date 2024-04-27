@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 import '../generated_bindings.dart';
 import 'current_plugin.dart';
 import 'types.dart';
+import 'userdata.dart';
 
 typedef MemoryOffset = int;
 
@@ -65,14 +66,15 @@ class ExtismApi {
 
   /// Get the length of an allocated block
   /// NOTE: this should only be called from host functions.
-  ffi.Pointer currentPluginMemoryLength(
+  int currentPluginMemoryLength(
     ExtismCurrentPluginPtr plugin,
     int n,
   ) =>
-      ffi.Pointer.fromAddress(_lib.extism_current_plugin_memory_length(
+      ffi.Pointer<ffi.Uint64>.fromAddress(
+          _lib.extism_current_plugin_memory_length(
         plugin,
         n,
-      ));
+      )).address;
 
   /// Free an allocated memory block
   /// NOTE: this should only be called from host functions.
@@ -163,6 +165,7 @@ class ExtismApi {
   ffi.Pointer<ExtismPlugin> pluginNew(
     Uint8List wasm,
     List<ffi.Pointer<ExtismFunction>> functions,
+    // ignore: avoid_positional_boolean_parameters
     bool withWasi,
     ErrorMsg errmsg,
   ) {
@@ -257,6 +260,20 @@ class ExtismApi {
       funcName,
       data,
       dataLen,
+    );
+  }
+
+  int pluginCallWithUserData(
+    ffi.Pointer<ExtismPlugin> plugin,
+    String functionName,
+    UserData data,
+  ) {
+    ffi.Pointer<ffi.Char> funcName = functionName.toNativeUtf8().cast();
+    return _lib.extism_plugin_call(
+      plugin,
+      funcName,
+      data.uint8Ptr,
+      data.length,
     );
   }
 

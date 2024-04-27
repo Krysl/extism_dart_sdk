@@ -184,7 +184,7 @@ class WasmURL {
   Map<String, dynamic> toJson() => _$WasmURLToJson(this);
 }
 
-@JsonSerializable()
+@JsonSerializable(createToJson: false)
 class Wasm {
   final WasmSource src;
 
@@ -204,7 +204,7 @@ class Wasm {
         _hash = hash;
 
   factory Wasm.fromJson(Map<String, dynamic> json) => _$WasmFromJson(json);
-  // Map<String, dynamic> toJson() => _$WasmToJson(this);
+
   Map<String, dynamic> toJson() {
     var map = src.toJson();
     if (_hash != null) {

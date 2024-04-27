@@ -6,6 +6,8 @@ import 'package:extism_dart_sdk/extism_dart_sdk.dart';
 import 'package:ffi/ffi.dart';
 import 'package:test/test.dart';
 
+import '../../wasms.dart';
+
 void main() {
   late final ExtismApi extism;
 
@@ -20,7 +22,7 @@ void main() {
     test('code from Extism C SDK Example', () {
       // extism.logCustom("extism=trace,cranelift=trace");
       extism.logCustom('debug');
-      final wasm = File('test/wasm/code-functions.wasm').readAsBytesSync();
+      final wasm = File(WasmFiles.wasm).readAsBytesSync();
 
       void helloWorld(
           ffi.Pointer<ExtismCurrentPlugin> plugin,
@@ -37,23 +39,20 @@ void main() {
         final buf = extism.currentPluginMemory(plugin) + ptrOffs;
         final length = extism
             .currentPluginMemoryLength(plugin, ptrOffs)
-            .cast<ffi.Int64>()
-            .value;
+            ;
 
         print('get currentPluginMemory: ${buf.toDartString(length: length)}');
-      }
-
-      void freeUserData(ffi.Pointer<ffi.Void> _) {
-        print('freeUserData');
       }
 
       final fn1 = extism.functionNew(
         'hello_world',
         [ExtismValType.I64],
         [ExtismValType.I64],
-        ffi.NativeCallable.isolateLocal(helloWorld),
-        'Dart userData => plugin:Hello, again!'.toNativeUtf8().cast(),
-        freeUserData,
+        helloWorld.nativeCallable,
+        'Dart userData => plugin:Hello, again!'.n.voidPtr,
+        (ffi.Pointer<ffi.Void> _) {
+          print('freeUserData');
+        },
       );
       final errmsg = ErrorMsg();
       final plugin = extism.pluginNew(
@@ -63,11 +62,10 @@ void main() {
         errmsg,
       );
       final testData = 'test data';
-      extism.pluginCall(
+      extism.pluginCallWithUserData(
         plugin,
         'count_vowels',
-        testData.toNativeUtf8().cast(),
-        testData.length,
+        testData.n,
       );
       final len = extism.pluginOutputLength(plugin);
       final output = extism.pluginOutputData(plugin);
