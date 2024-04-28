@@ -29,23 +29,5 @@ dev_dependencies:
   test: ^1.24.0
   toml: ^0.15.0
   vm_service: ^14.2.1
-
-ffigen:
-  output: 'lib/extism/generated_bindings.dart'
-  llvm-path: 
-    - 'D:/Program Files/LLVM/'
-  headers:
-    entry-points:
-      - 'assets/lib/windows/extism.h'
-  name: 'LibExtism'
-  preamble: '// ignore_for_file: unused_element, unused_field'
-  enums:
-    rename:
-      "ExtismValType": "_ExtismValType"
-  macros:
-    rename:
-      "_+(.*)": "$1"
-  functions:
-    symbol-address:
-      include:
-        - 'extism_function_free'
+ 
+# ffigen: # using `dart run ffigen . --config ffigen.yaml` instead

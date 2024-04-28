@@ -253,15 +253,13 @@ class ExtismApi {
     String functionName,
     ffi.Pointer<ffi.Uint8> data,
     int dataLen,
-  ) {
-    ffi.Pointer<ffi.Char> funcName = functionName.toNativeUtf8().cast();
-    return _lib.extism_plugin_call(
-      plugin,
-      funcName,
-      data,
-      dataLen,
-    );
-  }
+  ) =>
+      _lib.extism_plugin_call(
+        plugin,
+        functionName.n.charPtr,
+        data,
+        dataLen,
+      );
 
   int pluginCallWithUserData(
     ffi.Pointer<ExtismPlugin> plugin,

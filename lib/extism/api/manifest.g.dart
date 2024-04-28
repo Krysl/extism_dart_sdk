@@ -46,8 +46,8 @@ Map<String, dynamic> _$DataSourceUint8ListToJson(
 
 DataSourcePtr _$DataSourcePtrFromJson(Map<String, dynamic> json) =>
     DataSourcePtr(
-      const Uint8PtrConverter().fromJson(json['ptr'] as int),
-      json['len'] as int,
+      const Uint8PtrConverter().fromJson((json['ptr'] as num).toInt()),
+      (json['len'] as num).toInt(),
     );
 
 Map<String, dynamic> _$DataSourcePtrToJson(DataSourcePtr instance) =>
@@ -59,7 +59,7 @@ Map<String, dynamic> _$DataSourcePtrToJson(DataSourcePtr instance) =>
 WasmSourceBytes _$WasmSourceBytesFromJson(Map<String, dynamic> json) =>
     WasmSourceBytes(
       dataFromJson(json['data']),
-      json['len'] as int,
+      (json['len'] as num).toInt(),
     );
 
 Map<String, dynamic> _$WasmSourceBytesToJson(WasmSourceBytes instance) =>
@@ -92,12 +92,26 @@ Manifest _$ManifestFromJson(Map<String, dynamic> json) => Manifest(
               ?.map((e) => Wasm.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
-    )
-      ..memory = MemoryOptions.fromJson(json['memory'] as Map<String, dynamic>)
-      ..timeout = json['timeout_ms'] as int?;
+      config: json['config'] as Map<String, dynamic>? ?? const {},
+      memory: json['memory'] == null
+          ? null
+          : MemoryOptions.fromJson(json['memory'] as Map<String, dynamic>),
+      allowedHosts: (json['allowed_hosts'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+      allowedPaths: (json['allowed_paths'] as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry(k, e as String),
+          ) ??
+          const {},
+      timeout: (json['timeout_ms'] as num?)?.toInt(),
+    );
 
 Map<String, dynamic> _$ManifestToJson(Manifest instance) => <String, dynamic>{
+      'config': instance.config,
       'wasm': instance.wasmList,
       'memory': instance.memory,
+      'allowed_hosts': instance.allowedHosts,
+      'allowed_paths': instance.allowedPaths,
       'timeout_ms': instance.timeout,
     };

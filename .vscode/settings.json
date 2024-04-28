@@ -1,0 +1,7 @@
+{
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/dart-lang/native/main/pkgs/ffigen/ffigen.schema.json": [
+      "ffigen.yaml",
+    ]
+  },
+}

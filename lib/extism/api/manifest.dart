@@ -6,7 +6,6 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../extism_dart_sdk.dart';
 import '../../utils/json_converter.dart';
 
-// part 'manifest.freezed.dart';
 part 'manifest.g.dart';
 
 enum WasmSourceType { path, url, bytes }
@@ -217,20 +216,39 @@ class Wasm {
 /// Schema: https://extism.org/docs/concepts/manifest#schema
 @JsonSerializable()
 class Manifest {
-  final Map<String, String> config = {};
+  final Map<String, dynamic> config;
 
   @JsonKey(name: 'wasm')
   final List<Wasm> wasmList;
 
-  MemoryOptions memory = MemoryOptions();
+  MemoryOptions memory;
 
-  final List<String> allowedHosts = [];
-  final Map<String, String> allowedPaths = {};
+  @JsonKey(name: 'allowed_hosts', includeToJson: true)
+  final List<String> allowedHosts;
+
+  @JsonKey(name: 'allowed_paths')
+  final Map<String, String> allowedPaths;
 
   @JsonKey(name: 'timeout_ms')
   int? timeout;
 
-  Manifest({this.wasmList = const []});
+  Manifest({
+    List<Wasm>? wasmList,
+    Map<String, dynamic>? config,
+    MemoryOptions? memory,
+    List<String>? allowedHosts,
+    Map<String, String>? allowedPaths,
+    this.timeout,
+    int? memoryMax,
+  })  : wasmList = wasmList ?? [],
+        config = config ?? {},
+        allowedHosts = allowedHosts ?? [],
+        allowedPaths = allowedPaths ?? {},
+        memory = memory ?? MemoryOptions() {
+    if (memoryMax != null) {
+      this.memory.max_pages = memoryMax;
+    }
+  }
 
   /// Create manifest with a single Wasm from a path
   factory Manifest.path(String path) => Manifest(wasmList: [Wasm.path(path)]);

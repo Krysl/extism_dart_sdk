@@ -7,7 +7,7 @@ part of 'runtime_test.dart';
 // **************************************************************************
 
 _$CountImpl _$$CountImplFromJson(Map<String, dynamic> json) => _$CountImpl(
-      count: json['count'] as int,
+      count: (json['count'] as num).toInt(),
     );
 
 Map<String, dynamic> _$$CountImplToJson(_$CountImpl instance) =>

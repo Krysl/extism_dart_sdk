@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math';
 
 import 'package:extism_dart_sdk/extism_dart_sdk.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:path/path.dart' as path;
 import 'package:test/test.dart';
 import 'package:toml/toml.dart';
 
@@ -46,9 +48,12 @@ void main() {
   late final ExtismApi extism;
   final log = logger;
 
+  late final currentDartFilePath2 = currentDartFilePath();
   setUpAll(() {
     extism = ExtismApi.api;
     expect(extism.version, matches(r'\d+.\d+.\d+'));
+    // extism.logCustom('debug');
+    // extism.logCustom('extism=trace,cranelift=trace');
   });
 
   //code ported from tests/runtime.rs
@@ -476,10 +481,96 @@ void main() {
         print('#3 count = $count');
       }
     });
+    // test_extism_error: no C API
+
+    // -TODO: test_extism_memdump // no C API
+    // -TODO: test_extism_coredump // no C API
+
+    test('test userdata', () {
+      final helloWorldUserData = defineDartUserDataFunction(
+        (currentPlugin, userdata) {
+          final plugin = currentPlugin.ref;
+          final path = userdata.cast<Uint8>().toDartString();
+          final buf = plugin.inputBuffer(0);
+          File(path).writeAsBytesSync(buf.asTypedList());
+          plugin.outputBuffer(buf, 0);
+        },
+      );
+      final pathStr = path.setExtension(currentDartFilePath2, '.test.log');
+      var file = File(pathStr);
+      if (file.existsSync()) {
+        file.deleteSync();
+      }
+      file.createSync();
+      final f = HostFunctionFactory.newFunc(
+        'hello_world',
+        [ExtismValType.PTR],
+        [ExtismValType.PTR],
+        helloWorldUserData,
+        pathStr.n.voidPtr,
+        (_) {},
+        namespace: 'extism:host/user',
+      );
+      final plugin = Plugin.fromManifest(
+        Manifest.path(WasmFiles.wasm),
+        functions: [f.func],
+        withWasi: true,
+      );
+      final rand =
+          1000 + Random(DateTime.now().millisecondsSinceEpoch).nextInt(1000);
+      final output = plugin.callWithString('count_vowels', 'a' * rand);
+      expect(
+          output.inspectErr((e) {
+            throw e;
+          }).isOk(),
+          isTrue);
+      final data = file.readAsStringSync();
+      final {'count': count} = jsonDecode(data) as Map<String, dynamic>;
+      expect(count, rand);
+    });
+
+    test('test http not allowed', () {
+      final plugin = Plugin.fromManifest(
+        Manifest.path(WasmFiles.wasmHttp),
+      );
+      final res = plugin.callWithString(
+        'http_request',
+        r'{"url": "https://extism.org"}',
+      );
+      expect(res.isErrAnd((e) {
+        if (e is ExtismCallError) {
+          final msg = e.message;
+          if (msg is String && RegExp('').hasMatch(msg)) {
+            return true;
+          }
+        }
+        return false;
+      }), isTrue);
+    });
+
+    test('test http get', () {
+      var plugin = Plugin.fromManifest(
+        Manifest.path(WasmFiles.wasmHttp)..addAllowedHost('extism.org'),
+        withWasi: true,
+      );
+
+      final res = plugin
+          .callWithString(
+            'http_request',
+            // r'{"url": "https://extism.org"}',
+            jsonEncode({
+              'url': 'https://extism.org',
+            }),
+          )
+          .unwrap()
+          .toDartString();
+      expect(res, matches('</html>'));
+    });
 
     tearDown(() {
       extism.logDrain(
-        (String output, int len) => print('[log] len = $len, output = $output'),
+        (String output, int len) => print(
+            '[log] len = $len, output = ${output.replaceAll('\\n', '\n[log] ')}'),
       );
     });
   });

@@ -7,6 +7,9 @@ import 'package:ffi/ffi.dart';
 import 'current_plugin.dart';
 import 'types.dart';
 
+DartUserDataFunction defineDartUserDataFunction(DartUserDataFunction func) =>
+    func;
+
 typedef DartUserDataFunction = void Function(
   CurrentPluginPtr currentPlugin,
   VoidPointer userdata,
@@ -50,17 +53,18 @@ class UserData<T extends ffi.NativeType> implements ffi.Finalizable {
   }
 
   /// code from [package:ffi toNativeUtf8](https://pub.dev/documentation/ffi/latest/ffi/StringUtf8Pointer/toNativeUtf8.html)
+  /// [[vm/ffi] Investigate copy-free Strings](@dart-lang/sdk#39787)
   static UserData<ffi.Uint8> fromString(String str) {
     final units = utf8.encode(str);
     final size = units.length + 1;
     final ffi.Pointer<ffi.Uint8> result = calloc.call<ffi.Uint8>(size);
     final Uint8List nativeString = result.asTypedList(
       size,
-      finalizer: calloc.nativeFree,
+      // finalizer: calloc.nativeFree,
     );
     nativeString.setAll(0, units);
     nativeString[units.length] = 0;
-    return UserData<ffi.Uint8>._(result, size);
+    return UserData<ffi.Uint8>._(result, units.length);
   }
 
   static final _finalizer = ffi.NativeFinalizer(calloc.nativeFree);

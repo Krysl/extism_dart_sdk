@@ -14,6 +14,7 @@ extension BufferAsTypedList on Buffer {
   int get ofst => $3;
 
   Uint8List asTypedList() => ptr.asTypedList(size);
+  int asInt() => ptr.cast<ffi.Uint32>().value;
 
   String toDartString() => ptr.cast<Utf8>().toDartString();
 

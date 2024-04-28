@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:extism_dart_sdk/extism_dart_sdk.dart';
@@ -25,14 +26,39 @@ void main() {
   group('manifest test', () {
     test('from path', () {
       final manifest = Manifest.path('test/wasm/code-functions.wasm');
-      expect(manifest.toJsonString(indent: '  '), SchemaMatcher(schema));
+      final jsonString = manifest.toJsonString(indent: '  ');
+      print(jsonString);
+      expect(jsonString, SchemaMatcher(schema));
     });
     test('from path with XXX', () {
       final manifest = Manifest.path('test/wasm/code-functions.wasm')
         ..withTimeout(Duration(seconds: 1))
         ..memoryMax = 16
         ..disallowAllHosts();
-      expect(manifest.toJsonString(indent: '  '), SchemaMatcher(schema));
+      final jsonString = manifest.toJsonString(indent: '  ');
+      print(jsonString);
+      expect(jsonString, SchemaMatcher(schema));
+    });
+    test('from path with AllowedHost', () {
+      final allowedHost = 'extism.org';
+      final manifest = Manifest.path('test/wasm/code-functions.wasm')
+        ..withTimeout(Duration(seconds: 1))
+        ..memoryMax = 16
+        ..addAllowedHost(allowedHost);
+      final jsonString = manifest.toJsonString(indent: '  ');
+      print(jsonString);
+      expect(jsonString, SchemaMatcher(schema));
+      final {'allowed_hosts': allowedHosts} =
+          jsonDecode(jsonString) as Map<String, dynamic>;
+
+      expect(
+        allowedHosts,
+        isList.having(
+          (list) => list.first,
+          'first host',
+          equals(allowedHost),
+        ),
+      );
     });
   });
 }
